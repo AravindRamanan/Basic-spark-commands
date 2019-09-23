@@ -1,0 +1,110 @@
+1) To read a file from local file system as a RDD,
+ 
+val a = sc.textFile("file:///home/ramanana/sample_file.txt")
+ 
+2) If you want to view the content of a RDD, one way is to use collect():
+ 
+myRDD.collect().foreach(println)
+ 
+That's not a good idea, though, when the RDD has billions of lines. Use take() to take just a few to print out:
+ 
+myRDD.take(n).foreach(println)
+ 
+3) To read a file from hdfs as a RDD
+ 
+val b = sc.textFile("/user/ramanana/sample_file.txt")
+ 
+4)How to read a file as a dataframe?
+ 
+val a = spark.read.text("/user/ramanana/sample_file.txt")
+ 
+5) how to read a csv file as a dataframe ?
+ 
+val k = spark.read.csv("/user/ramanana/employee.txt")
+  
+6) how to get the header of a file while reading it as a dataframe?
+ 
+val k = spark.read.option("header","true").csv("/user/ramanana/employee.txt")
+ 
+7) Convert RDD to DataFrame
+
+val dataFrame = rdd.toDF()
+
+8) Convert DataFrame to RDD
+
+val rows: RDD[Row] = df.rdd
+
+9) how to save the contents of a dataframe as a parquet file
+
+peopleDF.select("name", "age").write.format("parquet").save("namesAndAges.parquet")
+
+10) how to calculate avg of a numeric column by grouping with a column
+
+a.groupBy($"manager_name").agg(avg($"response_time").as("time")).show()
+
+11) how to use row_number with filter condition
+
+    ev_acc_df = spark
+      .table(s"$CONF_EV_MD_HIVE_DB.account")
+      .filter(
+        $"data_dt" === accMaxDt && $"business_line" === "DTV" && $"src_system" === "STMS" && $"cust_acct_mkt_desc" === "RESIDENTIAL")
+      .select(
+        "ban",
+        "account_start_dt",
+        "cust_acct_stat_desc",
+        "last_disc_rsn_cd",
+        "zip",
+        "dtv_dma_cd",
+        "dlr_acct_key",
+        "status",
+        "data_dt"
+      )
+      .withColumn(s"ban_rank", row_number().over(Window.partitionBy("ban").orderBy(col("account_start_dt").desc)))
+      .filter("ban_rank=1")
+	  
+	  
+12) If you have to add a column to dataframe, withColumn can be used (attributes column will be added to the dataFrame ev_acc_dlr_df)
+
+    ev_acc_dlr_df = ev_acc_df
+      .join(ev_dlr_df, ev_acc_df.col("dlr_acct_key") === ev_dlr_df.col("dlr_acct_key"), "left")
+      .drop(ev_dlr_df("data_dt"))
+      .withColumn("attributes",
+                  concat_ws(",",
+                            $"video_svc_status",
+                            $"zip",
+                            $"account_start_dt_utc",
+                            $"dlr_name",
+                            $"lead_dlr_name",
+                            $"dtv_dma_cd"))
+
+13) Joining 2 dataframes
+
+
+val a = spark.sql("select actn_type_code from dev01_open_area.intm_wmis_action_type where tech_closure_flag='INSERT' and actn_type_code in ('EU','Z0','Z3')")
+    
+val b = spark.sql("SELECT wr_no,wr_rfa_no,skill_code,cc_chg_exc_vat,date_created,actn_type_code,fq_chg_ex_vat,rfa_charge_type FROM dev01_open_area.intm_wmis_wr_rfa WHERE tech_closure_flag = 'INSERT'")
+	
+
+
+val first = a.as("aa").join(b.as("bb"),$"aa.actn_type_code" === $"bb.actn_type_code","inner")
+
+14) joining 2 dataframes with more than one join condition
+
+
+val fourth = third.as("thirdd").join(e.as("ee"), ($"ee.geography_hrchy_svc_center" === $"thirdd.company_code" && $"ee.geography_hierarchy_ops_area"  ===  $"thirdd.region_code" && $"ee.geography_hierarchy_patch" ===  $"thirdd.operating_district_code" && $"ee.geography_hrchy_engnr_sctr" ===  $"thirdd.engineer_sector_id" && $"ee.geography_hrchy_pstcd_sctr" ===  $"thirdd.postcode_sector_id"),"inner")
+
+
+15) coalesce vs repartition
+
+One difference I get is that with repartition() the number of partitions can be increased/decreased, but with coalesce() the number of partitions can only be decreased.
+
+repartition - its recommended to use repartition while increasing no of partitions, because it involve shuffling of all the data.
+
+coalesce- it’s is recommended to use coalesce while reducing no of partitions. For example if you have 3 partitions and you want to reduce it to 2 partitions, Coalesce will move 3rd partition Data to partition 1 and 2. Partition 1 and 2 will remains in same Container.but repartition will shuffle data in all partitions so network usage between executor will be high and it impacts the performance.
+
+Performance wise coalesce performance better than repartition while reducing no of partitions.
+
+coalesce command:
+
+finalData.coalesce(5).createOrReplaceTempView("finalData")
+
